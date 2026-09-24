@@ -1,108 +1,83 @@
-const normalClock = document.getElementById("clock");
-const pomodoroClock = document.getElementById("pomodoroClock");
-const buttons = document.querySelectorAll("button");
+const clockElement = document.getElementById("clock");
+const timerDisplay = document.getElementById("pomodoroClock");
 
-const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const MODES = {
+  pomodoro: 25 * 60,
+  shortBreak: 5 * 60,
+  longBreak: 15 * 60,
+};
 
-//Normal clock
+let currentMode = "pomodoro";
+let timeLeft = MODES[currentMode];
+let intervalId = null;
 
-clock();
-setInterval(clock, 1000);
+const alarmSound = new Audio("alarm-clock-90867.mp3");
 
-function clock() {
-    let date = new Date();
-    let day = String(date.getDate()).padStart(2, "0");
-    let month = months[date.getMonth()];
-    let year = date.getFullYear();
-    let hours = String(date.getHours()).padStart(2, "0");
-    let minutes = String(date.getMinutes()).padStart(2, "0");
-    let dayOfWeek = days[date.getDay()];
-    normalClock.textContent = `${dayOfWeek}, ${day} ${month} ${year}, ${hours}:${minutes}`;
+function updateSystemClock() {
+  const now = new Date();
+  clockElement.textContent = new Intl.DateTimeFormat("en-GB", {
+    weekday: "long",
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(now);
 }
 
-//Pomodoro Timer
+updateSystemClock();
+setInterval(updateSystemClock, 1000);
 
-let interval;
-let timeLeft = 1500;
-let resetTime = 1500;
-let isStarted = false;
+function formatTime(seconds) {
+  const m = String(Math.floor(seconds / 60)).padStart(2, "0");
+  const s = String(seconds % 60).padStart(2, "0");
+  return `${m}:${s}`;
+}
 
-const POMODORO = 1500;
-const SHORT_BREAK = 300;
-const LONG_BREAK = 900;
-
-let audio = new Audio('alarm-clock-90867.mp3');
-
-updateTimer();
-
-buttons.forEach(button => {
-    button.addEventListener("click", event => {
-        switch (event.target.id) {
-            case "start":
-                startTimer();
-                break;
-            case "stop":
-                stopTimer();
-                break;
-            case "reset":
-                resetTimer(resetTime);
-                break;
-            case "pomodoro":
-                changeColor("hsl(0, 100%, 60%)", "hsl(0, 100%, 75%)");
-                resetTimer(POMODORO);
-                break;
-            case "shortBreak":
-                changeColor("hsla(209, 55%, 45%, 1.00)", "hsla(209, 65%, 65%, 1.00)");
-                resetTimer(SHORT_BREAK);
-                break;
-            case "longBreak":
-                changeColor("hsla(138, 32%, 46%, 1.00)", "hsla(138, 40%, 63%, 1.00)");
-                resetTimer(LONG_BREAK);
-                break;
-        }
-    })
-})
+function renderTimer() {
+  const formatted = formatTime(timeLeft);
+  timerDisplay.textContent = formatted;
+  document.title = `${formatted} - Pomodoro`;
+}
 
 function startTimer() {
-    if (!isStarted) {
-        interval = setInterval(() => {
-            timeLeft--;
-            updateTimer();
-            if (timeLeft <= 0) {
-                stopTimer();
-                audio.play();
-            }
-        }, 1000);
-        isStarted = true;
+  if (intervalId !== null) return;
+
+  intervalId = setInterval(() => {
+    timeLeft--;
+    renderTimer();
+
+    if (timeLeft <= 0) {
+      stopTimer();
+      alarmSound.play().catch(() => {});
     }
-}
-
-function updateTimer() {
-    let minutes = String(Math.floor(timeLeft / 60)).padStart(2, "0");
-    let seconds = String(timeLeft % 60).padStart(2, "0");
-
-    pomodoroClock.textContent = `${minutes}:${seconds}`;
+  }, 1000);
 }
 
 function stopTimer() {
-    clearInterval(interval);
-    isStarted = false;
+  clearInterval(intervalId);
+  intervalId = null;
 }
 
-function resetTimer(time) {
-    stopTimer();
-    timeLeft = time;
-    resetTime = time;
-    updateTimer();
+function resetTimer() {
+  stopTimer();
+  timeLeft = MODES[currentMode];
+  renderTimer();
 }
 
-//Visuals
-
-function changeColor(darkColor, lightColor) {
-    document.querySelector("header").style.backgroundColor = darkColor;
-    document.querySelector("main").style.backgroundColor = lightColor;
-    buttons.forEach(button => {
-        button.style.backgroundColor = darkColor;
-    })
+function switchMode(modeKey) {
+  if (!MODES[modeKey]) return;
+  currentMode = modeKey;
+  document.body.dataset.theme = modeKey;
+  resetTimer();
 }
+
+document.querySelectorAll("[data-mode]").forEach((btn) => {
+  btn.addEventListener("click", () => switchMode(btn.dataset.mode));
+});
+
+document.getElementById("start").addEventListener("click", startTimer);
+document.getElementById("stop").addEventListener("click", stopTimer);
+document.getElementById("reset").addEventListener("click", resetTimer);
+
+renderTimer();
